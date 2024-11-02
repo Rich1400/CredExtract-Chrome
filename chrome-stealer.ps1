@@ -1,3 +1,6 @@
+# Bypass execution policy for this session
+Set-ExecutionPolicy Bypass -Scope Process -Force
+
 # Self-elevate PowerShell script
 If (-Not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator"))
 {
